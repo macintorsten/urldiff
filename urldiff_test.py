@@ -18,15 +18,6 @@ class TestUrlDistance(unittest.TestCase):
         u2 = urlsplit("http://www.google.com/search/path/?q=term#fragment")
         self.assertNotEqual(url_distance(u1, u2), 0)
 
-    def test_path_distance_equal(self):
-        u = urlsplit("http://www.google.com/search?q=term#fragment")
-        distance_zero = path_distance(u, u)
-        self.assertEqual(distance_zero, 0)
-
-        u = urlsplit("http://www.google.com/search/path/?q=term#fragment")
-        distance_zero = path_distance(u, u)
-        self.assertEqual(distance_zero, 0)
-
     def test_path_distance_not_equal(self):
         u1 = urlsplit("http://www.google.com/search?q=term#fragment")
         u2 = urlsplit("http://www.google.com/search/path/?q=term#fragment")
@@ -95,7 +86,7 @@ class TestUrlDistance(unittest.TestCase):
 
         self.assertEqual(d1, d2)
 
-    def test_path_distance_equals(self):
+    def test_path_distance_equal(self):
         u1 = urlsplit("/one/two/three")
         u2 = urlsplit("/one/two/three/four")
         u3 = urlsplit("/one/one/three/four")
@@ -108,6 +99,15 @@ class TestUrlDistance(unittest.TestCase):
 
         d = path_distance(u1, u3)
         self.assertEqual(d, 2)
+
+        u = urlsplit("http://www.google.com/search?q=term#fragment")
+        distance_zero = path_distance(u, u)
+        self.assertEqual(distance_zero, 0)
+
+        u = urlsplit("http://www.google.com/search/path/?q=term#fragment")
+        distance_zero = path_distance(u, u)
+        self.assertEqual(distance_zero, 0)
+
 
     def test_qs_distance_zero(self):
         q = urlsplit("?a=1&b=b&c=3")
@@ -133,15 +133,12 @@ class TestUrlDistance(unittest.TestCase):
         a2 = (1,2,3,4)
         self.assertEqual(iter_distance(a1,a2), 1)
 
-    def test_url_difference_big(self):
+    def test_qs_difference_big(self):
         u1 = urlsplit("https://sv.wikipedia.org/w/index.php")
         u2 = urlsplit("https://sv.wikipedia.org/w/index.php?a=1&b=2&c=3&d=4&e=5")
 
         d1 = qs_distance(u1, u2)
         self.assertEqual(d1, 5)
-
-        d2 = url_distance(u1, u2)
-        self.assertEqual(d2, 5)
 
 if __name__ == '__main__':
     unittest.main()
