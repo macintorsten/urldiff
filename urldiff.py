@@ -16,14 +16,24 @@ import unittest
 
 THRESHOLD = 1
 
+def parse_url(func):
+    """ Decorator that parses positional arguments to urls if needed """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        args = map(lambda u: urlsplit(u) if type(u) == str else u, args)
+        return func(*args, **kwargs)
+    return wrapper
+
 def iter_distance(i1, i2):
     diff = map(lambda t: t[0]!=t[1], zip(i1, i2))
     num_extra_objects = abs(len(i1) - len(i2))
     return sum(diff) + num_extra_objects
 
+@parse_url
 def file_distance(u1, u2):
     raise NotImplementedError()
 
+@parse_url
 def url_distance(u1, u2):
     # no special handling for these
     d = iter_distance(
@@ -31,16 +41,17 @@ def url_distance(u1, u2):
         (u2.scheme, u2.username, u2.password, u2.hostname, u2.port, u1.fragment)
     )
 
-    d += ext_distance(u1, u2)
+    d += ext_distance(u1.path, u2.path)
     
     # path
-    d += path_distance(u1, u2)
+    d += path_distance(u1.path, u2.path)
 
     # querytring
-    d += qs_distance(u1, u2) * 2
+    d += qs_distance(u1.query, u2.query) * 2
 
     return d
 
+@parse_url
 def path_distance(u1, u2):
 
     paths1 = list(filter(None, u1.path.split('/')))
@@ -48,6 +59,7 @@ def path_distance(u1, u2):
 
     return iter_distance(paths1, paths2)
 
+@parse_url
 def is_url_subset(u1, u2):
     u1_base = (u1.scheme, u1.hostname, u1.username, u1.password, u1.port) 
     u2_base = (u2.scheme, u2.hostname, u2.username, u2.password, u2.port)
@@ -65,6 +77,7 @@ def is_url_subset(u1, u2):
 
     return True
 
+@parse_url
 def ext_distance(u1, u2):
     _, ext1 = os.path.splitext(u1.path)
     _, ext2 = os.path.splitext(u2.path)
@@ -79,6 +92,7 @@ def ext_distance(u1, u2):
 
     return d
 
+@parse_url
 def qs_distance(u1, u2, keys_only=True):
     """ Calculates distance for querystring """
     qs1 = parse_qs(u1.query, keep_blank_values=False)
@@ -104,7 +118,8 @@ if __name__ == "__main__":
     for line in fileinput.input():
         raw_url = line.strip()
 
-        url = urlsplit(raw_url)
+        #url = urlsplit(raw_url)
+        url = raw_url
 
         if not unique_urls:
             unique_urls.append(url)
