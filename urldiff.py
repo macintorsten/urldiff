@@ -11,7 +11,9 @@ import functools
 import sys
 import os
 import fileinput
+from collections import ChainMap
 from urllib.parse import urlsplit, parse_qs, unwrap
+import bisect
 import unittest
 
 THRESHOLD = 2
@@ -137,29 +139,35 @@ def query_distance(u1, u2, keys_only=True):
     return d
 
 
-def get_unique_url(urls):
-    return urls
-
-
-if __name__ == "__main__":
+def main():
 
     unique_urls = list()
 
     for line in fileinput.input():
-        raw_url = line.strip()
+        raw_new_url = line.strip()
+        new_url = urlsplit(raw_new_url)
 
-        url = urlsplit(raw_url)
+        start_index = bisect.bisect(unique_urls, new_url)
 
-        if not unique_urls:
-            unique_urls.append(url)
+        found_low_distance = False
 
-        url_distance_current = functools.partial(url_distance, url, threshold=THRESHOLD)
+        # Loop in reverse order from insert points
+        # todo: implement logic to not loop over all old urls
+        for i in range(len(unique_urls)):
+            index = (start_index + 3 - i) % len(unique_urls)
+            old_url = unique_urls[index]
+            distance = url_distance(new_url, old_url, threshold=THRESHOLD)
 
-        all_distances = map(url_distance_current, unique_urls)
+            if distance < THRESHOLD:
+                found_low_distance = True
+                break
 
-        if not any(distance < THRESHOLD for distance in all_distances):
+        if not found_low_distance:
+            bisect.insort(unique_urls, new_url)
 
-            unique_urls.append(url)
             print("[Score >= {}]".format(THRESHOLD),
                 file=sys.stderr, end=" ", flush=True)
-            print(raw_url)
+            print(raw_new_url)
+
+if __name__ == "__main__":
+    main()
