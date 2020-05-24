@@ -14,7 +14,8 @@ import fileinput
 from urllib.parse import urlsplit, parse_qs, unwrap
 import unittest
 
-THRESHOLD = 1
+THRESHOLD = 2
+
 
 def parse_url(func):
     """ Decorator that parses positional arguments to urls if needed """
@@ -25,43 +26,65 @@ def parse_url(func):
     return wrapper
 
 def iter_distance(i1, i2):
-    diff = map(lambda t: t[0]!=t[1], zip(i1, i2))
+    diff = map(lambda t: t[0] != t[1], zip(i1, i2))
     num_extra_objects = abs(len(i1) - len(i2))
     return sum(diff) + num_extra_objects
+
 
 @parse_url
 def file_distance(u1, u2):
     raise NotImplementedError()
 
+
 @parse_url
-def url_distance(u1, u2):
+def url_distance(u1, u2, threshold=8000):
+    d = 0
+
     # no special handling for these
-    d = iter_distance(
+    if u1.path != u2.path:
+
+        # path
+        d += path_distance(u1, u2)
+
+        if d >= threshold:
+            return threshold
+
+        # extension
+        d += ext_distance(u1, u2)
+
+    if d >= threshold:
+        return threshold
+
+    if u1.query != u2.query:
+        d += query_distance(u1, u2) * 2
+
+    if d >= threshold:
+        return threshold
+
+    # normally static url components
+    d += iter_distance(
         (u1.scheme, u1.username, u1.password, u1.hostname, u1.port, u1.fragment),
         (u2.scheme, u2.username, u2.password, u2.hostname, u2.port, u1.fragment)
     )
 
-    d += ext_distance(u1.path, u2.path)
-    
-    # path
-    d += path_distance(u1.path, u2.path)
-
-    # querytring
-    d += qs_distance(u1.query, u2.query) * 2
+    if d >= threshold:
+        return threshold
 
     return d
+
 
 @parse_url
 def path_distance(u1, u2):
 
-    paths1 = list(filter(None, u1.path.split('/')))
-    paths2 = list(filter(None, u2.path.split('/')))
+    paths1 = u1.path.split('/')
+    paths2 = u2.path.split('/')
 
     return iter_distance(paths1, paths2)
 
+
 @parse_url
 def is_url_subset(u1, u2):
-    u1_base = (u1.scheme, u1.hostname, u1.username, u1.password, u1.port) 
+    u1_base = (u1.scheme, u1.hostname, u1.username, u1.password, u1.port)
     u2_base = (u2.scheme, u2.hostname, u2.username, u2.password, u2.port)
 
     if u1_base != u2_base:
@@ -76,6 +99,7 @@ def is_url_subset(u1, u2):
         return False
 
     return True
+
 
 @parse_url
 def ext_distance(u1, u2):
@@ -92,11 +116,12 @@ def ext_distance(u1, u2):
 
     return d
 
+
 @parse_url
-def qs_distance(u1, u2, keys_only=True):
+def query_distance(u1, u2, keys_only=True):
     """ Calculates distance for querystring """
-    qs1 = parse_qs(u1.query, keep_blank_values=False)
-    qs2 = parse_qs(u2.query, keep_blank_values=False)
+    qs1 = parse_qs(u1.query, keep_blank_values=False) if u1 else {}
+    qs2 = parse_qs(u2.query, keep_blank_values=False) if u2 else {}
 
     d = 0
     if len(qs1) > len(qs2):
@@ -111,25 +136,30 @@ def qs_distance(u1, u2, keys_only=True):
 
     return d
 
+
+def get_unique_url(urls):
+    return urls
+
+
 if __name__ == "__main__":
 
-    unique_urls = []
+    unique_urls = list()
 
     for line in fileinput.input():
         raw_url = line.strip()
 
-        #url = urlsplit(raw_url)
-        url = raw_url
+        url = urlsplit(raw_url)
 
         if not unique_urls:
             unique_urls.append(url)
 
-        distance_this_url = functools.partial(url_distance, url)
+        url_distance_current = functools.partial(url_distance, url, threshold=THRESHOLD)
 
-        all_distances = map(distance_this_url, unique_urls)
-        mindistance = min(all_distances)
+        all_distances = map(url_distance_current, unique_urls)
 
-        if mindistance > THRESHOLD:
+        if not any(distance < THRESHOLD for distance in all_distances):
+
             unique_urls.append(url)
-            print("[Score {}]".format(mindistance), file=sys.stderr, end=" ")
+            print("[Score >= {}]".format(THRESHOLD),
+                file=sys.stderr, end=" ", flush=True)
             print(raw_url)
