@@ -13,11 +13,11 @@ import os
 import fileinput
 import difflib
 from collections import ChainMap
-from urllib.parse import urlsplit, parse_qs, unwrap
+from urllib.parse import urlsplit, parse_qs, unwrap, urlunsplit
 import bisect
 import unittest
 
-THRESHOLD = 1
+THRESHOLD = 2
 
 
 def parse_url(func):
@@ -139,37 +139,81 @@ def query_distance(u1, u2, keys_only=True):
 
     return d
 
+def filter_significant(urls):
+    """ Generate - takes iterable as input """
+    significant_urls = list()
 
-def main():
-
-    unique_urls = list()
-
-    for line in fileinput.input():
-        raw_new_url = line.strip()
-        new_url = urlsplit(raw_new_url)
-
-        start_index = bisect.bisect(unique_urls, new_url)
+    for url in urls:
+        start_index = bisect.bisect(significant_urls, url)
 
         found_low_distance = False
 
         # Loop in reverse order from insert points
         # todo: implement logic to not loop over all old urls
-        for i in range(len(unique_urls)):
-            index = (start_index + 3 - i) % len(unique_urls)
-            old_url = unique_urls[index]
-            distance = url_distance(new_url, old_url, threshold=THRESHOLD)
+        for i in range(len(significant_urls)):
+            index = (start_index + 3 - i) % len(significant_urls)
+            old_url = significant_urls[index]
+            distance = url_distance(url, old_url, threshold=THRESHOLD)
 
             if distance < THRESHOLD:
                 found_low_distance = True
                 break
 
         if not found_low_distance:
-            bisect.insort(unique_urls, new_url)
+            bisect.insort(significant_urls, url)
 
-            print("[Score >= {}]".format(THRESHOLD),
-                file=sys.stderr, end=" ", flush=True)
-            print(raw_new_url)
+            yield url
+
+def main():
+
+    def url_generator():
+        for line in fileinput.input():
+            raw_new_url = line.strip()
+            new_url = urlsplit(raw_new_url)
+            yield new_url
+    
+    for found_url in filter_significant(url_generator()):
+        print(urlunsplit(found_url))
 
 
 if __name__ == "__main__":
     main()
+
+@parse_url
+def origin_bucket(url):
+    return [(url.scheme, url.hostname, url.port)]
+
+@parse_url
+def netloc_bucket(url):
+    return [url.netloc]
+
+@parse_url
+def query_set_bucket(url):
+    """ Create a bucket per querystring """
+    return parse_qs(url.query)
+
+@parse_url
+def query_key_bucket(url):
+    """ Create a bucket per key """
+    return frozenset(parse_qs(url.query))
+
+@parse_url
+def query_key_value_bucket(url):
+    """ Create a bucket per key,value-pair """
+    return parse_qs(url.query).items()
+
+@parse_url
+def fragmet_bucket(url):
+    """ Create a bucket per key #fragment identifier """
+    return [url.fragment]
+
+@parse_url
+def top_path_bucket(url):
+    """ Create a bucket per key /toplevel.path """
+    return [url.path.split('/')[0]]
+
+@parse_url
+def extension_bucket(url):
+    """ Create a bucket per key file extention """
+    _, ext = os.path.splitext(url.path)
+    return [ext] if ext else []
