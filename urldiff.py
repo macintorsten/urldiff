@@ -11,12 +11,13 @@ import functools
 import sys
 import os
 import fileinput
+import difflib
 from collections import ChainMap
 from urllib.parse import urlsplit, parse_qs, unwrap
 import bisect
 import unittest
 
-THRESHOLD = 2
+THRESHOLD = 1
 
 
 def parse_url(func):
@@ -77,11 +78,11 @@ def url_distance(u1, u2, threshold=8000):
 
 @parse_url
 def path_distance(u1, u2):
+    return 3.0 * (1 -  difflib.SequenceMatcher(lambda c: c in {'/', '.'}, u1.path, u2.path).quick_ratio())
+    #paths1 = u1.path.split('/')
+    #paths2 = u2.path.split('/')
 
-    paths1 = u1.path.split('/')
-    paths2 = u2.path.split('/')
-
-    return iter_distance(paths1, paths2)
+    #return iter_distance(paths1, paths2)
 
 
 @parse_url
@@ -168,6 +169,7 @@ def main():
             print("[Score >= {}]".format(THRESHOLD),
                 file=sys.stderr, end=" ", flush=True)
             print(raw_new_url)
+
 
 if __name__ == "__main__":
     main()
